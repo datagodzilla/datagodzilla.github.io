@@ -226,6 +226,27 @@ a:visited { color: #205caa; }
 .post-content ul,
 .post-content ol { padding-left: 20px; }
 
+/* Post images - responsive and centered */
+.post-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Image captions (emphasis following images) */
+.post-content p > img + em,
+.post-content img + br + em {
+  display: block;
+  text-align: center;
+  font-size: 14px;
+  color: #666;
+  margin-top: -0.5em;
+  margin-bottom: 1.5em;
+}
+
 .post pre,
 .post code {
   border: 1px solid #d5d5e9;
