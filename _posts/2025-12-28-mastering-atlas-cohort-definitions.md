@@ -8,6 +8,7 @@ author: DataGodzilla
 reading_time: 18 min
 keywords: [OHDSI ATLAS, cohort definitions, OMOP CDM, Type 2 Diabetes, clinical research, real-world evidence, PostgreSQL]
 layout: post
+mermaid: true
 ---
 
 # Mastering ATLAS Cohort Definitions: A Clinical Researcher's Complete Guide
