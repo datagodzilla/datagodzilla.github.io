@@ -1,5 +1,4 @@
 ---
-layout: post
 title: "Mastering ATLAS Cohort Definitions: A Clinical Researcher's Complete Guide"
 date: 2025-12-28
 categories: [ohdsi, atlas, cohort-studies, healthcare-data]
@@ -8,6 +7,7 @@ description: "Learn how to build reproducible patient cohorts in OHDSI ATLAS wit
 author: DataGodzilla
 reading_time: 18 min
 keywords: [OHDSI ATLAS, cohort definitions, OMOP CDM, Type 2 Diabetes, clinical research, real-world evidence, PostgreSQL]
+layout: post
 ---
 
 # Mastering ATLAS Cohort Definitions: A Clinical Researcher's Complete Guide
@@ -495,23 +495,171 @@ docker exec -i broadsea-atlasdb psql -U postgres < cdm_export.sql
 
 ---
 
+## Resolving the Schema Issues: Dr. Sarah Chen's Success
+
+After understanding the root cause, Dr. Chen chose **Option 1: Manual Schema Patching** to continue her research quickly. She applied the minimal fixes needed to enable cohort generation and characterization.
+
+### The Fifteen-Minute Fix
+
+The complete schema patch took just 15 minutes to apply:
+
+```sql
+-- Phase 1: Core Schema Fixes (for cohort generation)
+CREATE SCHEMA IF NOT EXISTS temp;
+GRANT ALL ON SCHEMA temp TO PUBLIC;
+
+ALTER TABLE results.cohort_inclusion ADD COLUMN IF NOT EXISTS design_hash INT;
+ALTER TABLE results.cohort_inclusion_result ADD COLUMN IF NOT EXISTS mode_id INT DEFAULT 0;
+ALTER TABLE results.cohort_inclusion_stats ADD COLUMN IF NOT EXISTS mode_id INT DEFAULT 0;
+ALTER TABLE results.cohort_summary_stats ADD COLUMN IF NOT EXISTS mode_id INT DEFAULT 0;
+ALTER TABLE results.cohort_censor_stats ADD COLUMN IF NOT EXISTS mode_id INT DEFAULT 0;
+
+-- Create cache tables for performance
+CREATE TABLE IF NOT EXISTS results.cohort_cache (
+    design_hash INT NOT NULL,
+    subject_id BIGINT NOT NULL,
+    cohort_start_date DATE NOT NULL,
+    cohort_end_date DATE NOT NULL
+);
+
+-- Phase 2: Characterization Fixes
+ALTER TABLE results.cc_results ADD COLUMN IF NOT EXISTS type VARCHAR(255);
+ALTER TABLE results.cc_results ADD COLUMN IF NOT EXISTS concept_id INTEGER DEFAULT 0;
+ALTER TABLE results.cc_results ADD COLUMN IF NOT EXISTS aggregate_id INTEGER;
+ALTER TABLE results.cc_results ADD COLUMN IF NOT EXISTS aggregate_name VARCHAR(1000);
+ALTER TABLE results.cc_results ADD COLUMN IF NOT EXISTS missing_means_zero INTEGER;
+
+-- Grant permissions
+GRANT ALL ON ALL TABLES IN SCHEMA results TO PUBLIC;
+GRANT ALL ON ALL TABLES IN SCHEMA temp TO PUBLIC;
+```
+
+After applying these patches and restarting WebAPI, Dr. Chen regenerated her cohorts.
+
+### Cohort Generation: Success!
+
+This time, the results displayed correctly in ATLAS:
+
+![Cohort Generation Success](/assets/images/posts/blog-cohort-generation-success.png)
+*The Type 2 Diabetes cohort now shows 219 patients with generation status COMPLETE*
+
+The cohort generation completed in just 1 second, returning **219 patients** who met all inclusion criteria:
+- First diagnosis of Type 2 Diabetes Mellitus
+- At least 365 days of prior observation
+- Age 18 or older at index date
+- No prior Type 1 or gestational diabetes diagnosis
+
+### Inclusion Reports: Understanding Population Attrition
+
+Clicking **"View Reports"** revealed the inclusion report—a powerful visualization showing how patients flow through each inclusion criterion:
+
+![Inclusion Report Success](/assets/images/posts/blog-inclusion-report-success.png)
+*The inclusion report shows 99.55% match rate with detailed population visualization*
+
+The report shows:
+- **220 initial qualifying events** from patients with T2DM diagnosis
+- **99.55% match rate** (219 of 220 passed all inclusion criteria)
+- **1 patient excluded** by the age requirement or prior diabetes exclusions
+
+The green population visualization (sometimes called an "attrition diagram") helps researchers understand exactly where patients are filtered out. This is crucial for validating that inclusion criteria aren't overly restrictive.
+
+### Running Characterization: The Complete Picture
+
+With cohorts generating correctly, Dr. Chen moved to **Characterization**—the feature that compares baseline demographics, conditions, and medications across cohorts.
+
+She configured a characterization analysis with:
+- **Target Cohort**: Type 2 Diabetes Mellitus (219 patients)
+- **Feature Analyses**: Demographics, conditions, drug exposures, procedures
+- **Stratification**: None (baseline analysis)
+
+After clicking "Generate," she monitored the **Jobs** page:
+
+![Jobs Completed](/assets/images/posts/blog-jobs-completed.png)
+*The Jobs page showing successful completion of cohort generation and characterization*
+
+All jobs completed successfully:
+- Jobs 7-11: Cohort generation for all 5 cohorts ✅
+- Job 14: Characterization generation ✅
+
+### Characterization Results: Demographics Analysis
+
+The characterization results revealed the clinical profile of her T2DM cohort:
+
+![Characterization Results](/assets/images/posts/blog-characterization-results.png)
+*Characterization results showing 866 records across 10 reports with demographics breakdown*
+
+Key findings from the demographics analysis:
+- **10 reports generated** covering different clinical domains
+- **866 total records** of baseline characteristics
+- **Age distribution** showing patients primarily in 40-70 age range
+- **Condition prevalence** showing common comorbidities
+- **Drug exposure patterns** at baseline
+
+The demographic breakdown matched clinical expectations for a Type 2 Diabetes population:
+- Higher prevalence in middle-aged and older adults
+- Common comorbidities including hypertension, hyperlipidemia
+- Baseline medication patterns consistent with diabetes management
+
+### The Complete End-to-End Workflow
+
+Dr. Chen's journey from clinical question to characterized cohort demonstrates the complete ATLAS workflow:
+
+```
+┌──────────────────────────────────────────────────────────────────────────┐
+│                Dr. Sarah Chen's Research Workflow                         │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                           │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌───────────┐ │
+│  │ 1. Clinical │───▶│ 2. Concept  │───▶│ 3. Build    │───▶│ 4. Add    │ │
+│  │    Question │    │    Mapping  │    │    Entry    │    │  Inclusion│ │
+│  │ "T2DM pts"  │    │  SNOMED     │    │    Events   │    │   Rules   │ │
+│  └─────────────┘    │  201826     │    │             │    │           │ │
+│                     └─────────────┘    └─────────────┘    └───────────┘ │
+│                                                                   │      │
+│                                                                   ▼      │
+│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌───────────┐ │
+│  │ 8. Clinical │◀───│ 7. Analyze  │◀───│ 6. View     │◀───│ 5. Generate│ │
+│  │    Insights │    │  Character- │    │  Inclusion  │    │   Cohort  │ │
+│  │ "Ready for  │    │    ization  │    │   Reports   │    │  219 pts  │ │
+│  │  estimation"│    │ 866 records │    │  99.55%     │    │           │ │
+│  └─────────────┘    └─────────────┘    └─────────────┘    └───────────┘ │
+│                                                                           │
+│  ✅ Result: Validated T2DM cohort ready for population-level estimation  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Dr. Chen Verified
+
+| Step | Feature | Result | Validated |
+|------|---------|--------|-----------|
+| 1 | Vocabulary Search | Found SNOMED 201826 | ✅ |
+| 2 | Cohort Definition | Created with 3 inclusion rules | ✅ |
+| 3 | Cohort Generation | 219 patients in < 1 second | ✅ |
+| 4 | Inclusion Reports | 99.55% match rate displayed | ✅ |
+| 5 | Population Visualization | Attrition diagram renders | ✅ |
+| 6 | Characterization | 866 records across 10 reports | ✅ |
+| 7 | Demographics Analysis | Age groups with counts | ✅ |
+| 8 | Job Tracking | All 14 jobs COMPLETED | ✅ |
+
+---
+
 ## Key Takeaways
 
 Here's what we learned from building cohorts in ATLAS:
 
-- **Cohorts are algorithms, not just patient lists** — They're reproducible across any OMOP CDM database worldwide
+✅ **Cohorts are algorithms, not just patient lists** — They're reproducible across any OMOP CDM database worldwide
 
-- **Three components define every cohort** — Entry event, inclusion criteria, exit criteria
+✅ **Three components define every cohort** — Entry event, inclusion criteria, exit criteria
 
-- **ATLAS generates SQL** — Understanding backend tables helps debugging when the UI shows unexpected results
+✅ **ATLAS generates SQL** — Understanding backend tables helps debugging when the UI shows unexpected results
 
-- **Concept sets are building blocks** — Invest time in creating comprehensive, validated concept sets with descendants
+✅ **Concept sets are building blocks** — Invest time in creating comprehensive, validated concept sets with descendants
 
-- **Always validate with characterization** — Never trust cohort counts alone; inspect demographics and clinical features
+✅ **Always validate with characterization** — Never trust cohort counts alone; inspect demographics and clinical features
 
-- **WebAPI is not the same as OMOP CDM** — The application has evolved beyond the base data model specification
+✅ **WebAPI ≠ OMOP CDM** — The application has evolved beyond the base data model specification
 
-- **Check the database directly** — When UI shows "...", the data may be correct in `results.cohort`
+✅ **Check the database directly** — When UI shows "...", the data may be correct in `results.cohort`
 
 ---
 
