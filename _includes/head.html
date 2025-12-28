@@ -24,10 +24,37 @@
     {% if page.mermaid %}
     <script type="module">
       import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+      // Initialize mermaid with startOnLoad disabled - we'll render manually
       mermaid.initialize({
-        startOnLoad: true,
+        startOnLoad: false,
         theme: 'default',
         securityLevel: 'loose'
+      });
+
+      // Convert Jekyll/kramdown code blocks to mermaid divs
+      document.addEventListener('DOMContentLoaded', function() {
+        // Find all code blocks with language-mermaid class
+        const codeBlocks = document.querySelectorAll('code.language-mermaid');
+
+        codeBlocks.forEach(function(codeBlock) {
+          // Get the mermaid code content
+          const mermaidCode = codeBlock.textContent;
+
+          // Create a new div with class mermaid
+          const mermaidDiv = document.createElement('div');
+          mermaidDiv.className = 'mermaid';
+          mermaidDiv.textContent = mermaidCode;
+
+          // Replace the pre>code with the mermaid div
+          const preBlock = codeBlock.parentElement;
+          if (preBlock && preBlock.tagName === 'PRE') {
+            preBlock.parentNode.replaceChild(mermaidDiv, preBlock);
+          }
+        });
+
+        // Now render all mermaid diagrams
+        mermaid.run();
       });
     </script>
     {% endif %}
